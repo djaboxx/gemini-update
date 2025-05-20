@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..agent.agent import Agent, RunContext
-from ..agent.common import ModelRetry
+from pydantic_ai import ModelRetry
 from ..models.analysis import AnalysisResult, LanguageStats
 from ..models.file_access import CodebaseContext
 from ..utils.log import logger
