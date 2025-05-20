@@ -32,6 +32,9 @@ from src.models import (
 )
 from src.agent.common import CommonGeminiTools
 from src.agent.agents import CodebaseAnalyzerAgent, FeatureSpecGeneratorAgent, ImplementationPlannerAgent
+from src.prompts.codebase_analyzer_prompt import get_codebase_analyzer_system_prompt, get_codebase_analyzer_prompt
+from src.prompts.feature_spec_prompt import get_feature_spec_system_prompt, get_feature_spec_prompt
+from src.prompts.implementation_planner_prompt import get_implementation_planner_system_prompt, get_implementation_planner_prompt
 
 
 logger = logging.getLogger("gemini_update")
