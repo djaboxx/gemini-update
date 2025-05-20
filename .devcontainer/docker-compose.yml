@@ -10,8 +10,8 @@ services:
       - gemini-update-extensions:/home/vscode/.vscode-server/extensions
       - vscode-server-data:/home/vscode/.vscode-server/data
       - vscode-server-bin:/home/vscode/.vscode-server/bin
-    env_file:
-      - ../.env
+    # env_file:
+    #   - ../.env
     command: sleep infinity
     user: vscode
     environment:
