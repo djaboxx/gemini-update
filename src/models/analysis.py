@@ -10,6 +10,46 @@ from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict
 
 
+class LanguageStats(BaseModel):
+    """Statistics of programming languages used in the codebase."""
+    # Use model instead of Dict[str, int] to avoid additionalProperties issue with Gemini
+    language_name: str = Field(..., description="Name of the programming language")
+    file_count: int = Field(..., description="Number of files using this language")
+
+
+class AnalysisResult(BaseModel):
+    """Result of a codebase analysis."""
+    project_type: str = Field(..., description="Identified project type")
+    primary_language: str = Field(..., description="Identified primary language")
+    description: str = Field(..., description="Brief analysis summary")
+    frameworks: List[str] = Field(default_factory=list, description="Identified frameworks")
+    files_analyzed: int = Field(..., description="Number of files analyzed")
+    language_stats: List[LanguageStats] = Field(default_factory=list, description="Statistics of languages used")
+
+    def to_markdown(self) -> str:
+        """Convert the analysis result to markdown."""
+        markdown = "# Codebase Analysis Report\n\n"
+        markdown += f"**Project Type:** {self.project_type}\n\n"
+        markdown += f"**Primary Language:** {self.primary_language}\n\n"
+        
+        if self.frameworks:
+            markdown += "**Frameworks:**\n\n"
+            for framework in self.frameworks:
+                markdown += f"- {framework}\n"
+            markdown += "\n"
+            
+        markdown += f"**Files Analyzed:** {self.files_analyzed}\n\n"
+        
+        markdown += "**Language Statistics:**\n\n"
+        for lang_stat in self.language_stats:
+            markdown += f"- {lang_stat.language_name}: {lang_stat.file_count} files\n"
+        markdown += "\n"
+        
+        markdown += f"**Summary:** {self.description}\n"
+        
+        return markdown
+
+
 class CodebaseFile(BaseModel):
     """Representation of a file in the codebase."""
     

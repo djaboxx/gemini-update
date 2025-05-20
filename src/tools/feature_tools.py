@@ -3,6 +3,7 @@ Pydantic-AI Tools for feature specification and implementation planning.
 """
 
 import os
+import re
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import logging
@@ -12,6 +13,7 @@ import json
 from pydantic_ai import Agent
 from pydantic_ai import RunContext
 from pydantic_ai import ModelRetry
+from pydantic import BaseModel
 
 from src.models import (
     CodebaseContext,
@@ -52,6 +54,15 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
             raise last_error
         return wrapped_tool
 
+    # Define a proper Pydantic model for the requirement input
+    class RequirementInput(BaseModel):
+        """Structured input for a feature requirement"""
+        id: Optional[str] = None
+        type: str
+        description: str
+        acceptance_criteria: Optional[List[str]] = None
+        dependencies: Optional[List[str]] = None
+        
     @retry_on_error
     @agent.tool
     async def create_feature_spec(
@@ -60,8 +71,8 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
         description: str,
         feature_type: str,
         priority: str,
-        requirements: List[Dict[str, Any]]
-    ) -> str:
+        requirements: List[RequirementInput]
+    ) -> FeatureSpec:
         """
         Create a structured feature specification.
 
@@ -74,7 +85,7 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
             requirements: List of requirements for this feature
 
         Returns:
-            JSON string representing the FeatureSpec
+            FeatureSpec Pydantic model
         """
         try:
             # Validate feature type
@@ -89,48 +100,54 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
             except ValueError:
                 raise ModelRetry(f"Invalid priority: {priority}. Must be one of: {', '.join([p.value for p in Priority])}")
                 
-            # Validate and create requirements
+            # Validate and create requirements using Pydantic's validation
             validated_requirements = []
             for i, req in enumerate(requirements):
-                # Generate an ID if not provided
-                req_id = req.get("id", f"REQ-{i+1}")
-                
-                # Validate requirement type
-                req_type = req.get("type", "functional")
                 try:
-                    req_type_enum = RequirementType(req_type.lower())
-                except ValueError:
-                    raise ModelRetry(f"Invalid requirement type: {req_type}. Must be one of: {', '.join([t.value for t in RequirementType])}")
+                    # Generate an ID if not provided
+                    if not req.id:
+                        req.id = f"REQ-{i+1}"
                     
-                # Create Requirement object
-                validated_requirements.append(
-                    Requirement(
-                        id=req_id,
-                        type=req_type_enum,
-                        description=req.get("description", ""),
-                        acceptance_criteria=req.get("acceptance_criteria", []),
-                        dependencies=req.get("dependencies", [])
+                    # Normalize requirement type if provided
+                    req_type = req.type.lower() if req.type else "functional"
+                    
+                    # Create and validate the Requirement model
+                    requirement = Requirement(
+                        id=req.id,
+                        type=req_type,
+                        description=req.description,
+                        acceptance_criteria=req.acceptance_criteria or [],
+                        dependencies=req.dependencies or []
                     )
-                )
+                    validated_requirements.append(requirement)
+                except Exception as e:
+                    valid_types = [t.value for t in RequirementType]
+                    raise ModelRetry(f"Invalid requirement data (#{i+1}): {str(e)}. Valid types are: {', '.join(valid_types)}")
                 
-            # Create FeatureSpec
-            feature_spec = FeatureSpec(
+            # Create and return FeatureSpec
+            return FeatureSpec(
                 name=name,
                 description=description,
                 feature_type=feature_type_enum,
                 priority=priority_enum,
                 requirements=validated_requirements,
-                user_personas=ctx.args.get("user_personas", []),
-                success_metrics=ctx.args.get("success_metrics", []),
-                technical_notes=ctx.args.get("technical_notes")
+                user_personas=[],  # Default to empty list
+                success_metrics=[],  # Default to empty list
+                technical_notes=None  # Default to None
             )
-            
-            # Return as JSON
-            return feature_spec.model_dump_json(indent=2)
             
         except Exception as e:
             raise ModelRetry(f"Error creating feature specification: {str(e)}")
             
+    # Define a proper Pydantic model for the change input
+    class ChangeInput(BaseModel):
+        """Structured input for a code change"""
+        file_path: str
+        change_type: str = "modify"  # Default to "modify"
+        description: str
+        code_snippet: Optional[str] = None
+        line_range: Optional[str] = None
+        
     @retry_on_error
     @agent.tool
     async def create_implementation_plan(
@@ -139,7 +156,7 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
         description: str,
         affected_files: List[str],
         new_files: List[str],
-        changes: List[Dict[str, Any]],
+        changes: List[ChangeInput],  # Use the Pydantic model instead of Dict
         estimated_complexity: str
     ) -> str:
         """
@@ -151,7 +168,7 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
             description: Description of what the feature does
             affected_files: List of existing files that need to be modified
             new_files: List of new files that need to be created
-            changes: List of specific code changes
+            changes: List of specific code changes with fields: file_path, change_type, description, code_snippet (optional), and line_range (optional)
             estimated_complexity: Estimated complexity (Low, Medium, High)
 
         Returns:
@@ -162,30 +179,30 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
             scope = FeatureScope(
                 affected_files=affected_files,
                 new_files=new_files,
-                dependencies_needed=ctx.args.get("dependencies_needed", []),
-                config_changes=ctx.args.get("config_changes", [])
+                dependencies_needed=[],  # Default to empty list
+                config_changes=[]  # Default to empty list
             )
             
-            # Validate and create code changes
+            # Convert and validate ChangeInput objects to CodeChange objects
             validated_changes = []
-            for change_data in changes:
-                # Validate change type
-                change_type_str = change_data.get("change_type", "modify")
+            for change_input in changes:
                 try:
-                    change_type = ChangeType(change_type_str.lower())
-                except ValueError:
-                    raise ModelRetry(f"Invalid change type: {change_type_str}. Must be one of: {', '.join([t.value for t in ChangeType])}")
+                    # Convert the change type string to lowercase
+                    normalized_change_type = change_input.change_type.lower() if change_input.change_type else "modify"
                     
-                # Create CodeChange object
-                validated_changes.append(
-                    CodeChange(
-                        file_path=change_data.get("file_path", ""),
-                        change_type=change_type,
-                        description=change_data.get("description", ""),
-                        code_snippet=change_data.get("code_snippet"),
-                        line_range=change_data.get("line_range")
+                    # Create a CodeChange object from the ChangeInput
+                    code_change = CodeChange(
+                        file_path=change_input.file_path,
+                        change_type=normalized_change_type,
+                        description=change_input.description,
+                        code_snippet=change_input.code_snippet,
+                        line_range=change_input.line_range
                     )
-                )
+                    
+                    validated_changes.append(code_change)
+                except Exception as e:
+                    valid_types = [t.value for t in ChangeType]
+                    raise ModelRetry(f"Invalid code change data: {str(e)}. Valid change types are: {', '.join(valid_types)}")
                 
             # Create ImplementationPlan
             implementation_plan = ImplementationPlan(
@@ -194,7 +211,7 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
                 scope=scope,
                 changes=validated_changes,
                 estimated_complexity=estimated_complexity,
-                dependencies=ctx.args.get("dependencies", [])
+                dependencies=[]  # Default to empty list
             )
             
             # Return as JSON
@@ -421,7 +438,7 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
     @agent.tool
     async def save_feature_spec(
         ctx: RunContext[CodebaseContext],
-        feature_spec_json: str,
+        feature_spec: FeatureSpec,
         output_path: str
     ) -> str:
         """
@@ -429,19 +446,13 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
 
         Args:
             ctx: The run context containing project filesystem access
-            feature_spec_json: JSON string representing a FeatureSpec
+            feature_spec: FeatureSpec Pydantic model object
             output_path: Path to save the markdown file
 
         Returns:
             Path to the saved file
         """
         try:
-            # Parse the feature spec JSON
-            try:
-                feature_spec = FeatureSpec.model_validate_json(feature_spec_json)
-            except Exception as e:
-                raise ModelRetry(f"Error parsing feature spec JSON: {str(e)}")
-                
             # Convert to markdown
             markdown = feature_spec.to_markdown()
             
@@ -461,7 +472,7 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
     @agent.tool
     async def save_implementation_plan(
         ctx: RunContext[CodebaseContext],
-        implementation_plan_json: str,
+        implementation_plan: ImplementationPlan,
         output_path: str
     ) -> str:
         """
@@ -469,19 +480,13 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
 
         Args:
             ctx: The run context containing project filesystem access
-            implementation_plan_json: JSON string representing an ImplementationPlan
+            implementation_plan: ImplementationPlan Pydantic model object
             output_path: Path to save the markdown file
 
         Returns:
             Path to the saved file
         """
         try:
-            # Parse the implementation plan JSON
-            try:
-                implementation_plan = ImplementationPlan.model_validate_json(implementation_plan_json)
-            except Exception as e:
-                raise ModelRetry(f"Error parsing implementation plan JSON: {str(e)}")
-                
             # Convert to markdown
             markdown = implementation_plan.to_markdown()
             
@@ -513,63 +518,63 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
         Returns:
             Dictionary with extracted feature concepts, patterns, and categories
         """
+        # Initialize result structure
+        result = {
+            "main_concepts": [],
+            "technical_components": [],
+            "ui_elements": [],
+            "data_elements": [],
+            "api_endpoints": [],
+            "implementation_patterns": []
+        }
+        
         try:
-            # Initialize result structure
-            result = {
-                "main_concepts": [],
-                "technical_components": [],
-                "ui_elements": [],
-                "data_elements": [],
-                "api_endpoints": [],
-                "patterns": []
-            }
-            
             # Extract key technical components
             # These are common technical terms that might indicate specific implementation areas
             tech_components = re.findall(r'\b(api|database|authentication|authorization|endpoint|component|service|'
-                                        r'controller|model|view|handler|middleware|hook|event|listener|router|'
-                                        r'reducer|store|context|provider|validator|parser|formatter|renderer|'
-                                        r'serializer|deserializer|transformer|converter|adapter|factory|builder|'
-                                        r'manager|coordinator|director|proxy|facade|decorator|observer|'
-                                        r'strategy|template|command|interpreter|visitor|mediator|memento|'
-                                        r'iterator|composite|bridge|flyweight|singleton|prototype)\b',
-                                        feature_description.lower())
+                                      r'controller|model|view|handler|middleware|hook|event|listener|router|'
+                                      r'reducer|store|context|provider|validator|parser|formatter|renderer|'
+                                      r'serializer|deserializer|transformer|converter|adapter|factory|builder|'
+                                      r'manager|coordinator|director|proxy|facade|decorator|observer|'
+                                      r'strategy|template|command|interpreter|visitor|mediator|memento|'
+                                      r'iterator|composite|bridge|flyweight|singleton|prototype)\b',
+                                      feature_description.lower())
             result["technical_components"] = list(set(tech_components))
             
             # Extract UI elements
             ui_elements = re.findall(r'\b(button|form|input|select|dropdown|menu|modal|dialog|popup|tooltip|'
-                                    r'alert|notification|tab|panel|card|grid|table|list|sidebar|navbar|footer|'
-                                    r'header|layout|container|section|divider|badge|label|image|icon|'
-                                    r'avatar|carousel|slider|progress|spinner|loader|toggle|switch|'
-                                    r'checkbox|radio|textbox|textarea|datepicker|timepicker|'
-                                    r'autocomplete|combobox|multiselect|tree|treeview|stepper|'
-                                    r'accordion|collapse|expansion|drawer|window|frame|canvas)\b',
-                                    feature_description.lower())
+                                  r'alert|notification|tab|panel|card|grid|table|list|sidebar|navbar|footer|'
+                                  r'header|layout|container|section|divider|badge|label|image|icon|'
+                                  r'avatar|carousel|slider|progress|spinner|loader|toggle|switch|'
+                                  r'checkbox|radio|textbox|textarea|datepicker|timepicker|'
+                                  r'autocomplete|combobox|multiselect|tree|treeview|stepper|'
+                                  r'accordion|collapse|expansion|drawer|window|frame|canvas)\b',
+                                  feature_description.lower())
             result["ui_elements"] = list(set(ui_elements))
             
             # Extract data elements
             data_elements = re.findall(r'\b(user|profile|account|session|token|credential|permission|role|'
-                                    r'config|setting|preference|option|data|record|entity|object|'
-                                    r'document|file|image|media|audio|video|text|content|message|'
-                                    r'notification|event|log|error|exception|warning|info|debug|'
-                                    r'trace|status|state|flag|indicator|counter|timer|date|time|'
-                                    r'timestamp|duration|interval|period|range|limit|threshold|'
-                                    r'constraint|rule|policy|contract|agreement|license|term|'
-                                    r'condition|requirement|specification)\b',
-                                    feature_description.lower())
+                                  r'config|setting|preference|option|data|record|entity|object|'
+                                  r'document|file|image|media|audio|video|text|content|message|'
+                                  r'notification|event|log|error|exception|warning|info|debug|'
+                                  r'trace|status|state|flag|indicator|counter|timer|date|time|'
+                                  r'timestamp|duration|interval|period|range|limit|threshold|'
+                                  r'constraint|rule|policy|contract|agreement|license|term|'
+                                  r'condition|requirement|specification)\b',
+                                  feature_description.lower())
             result["data_elements"] = list(set(data_elements))
             
             # Extract possible API endpoints
             api_endpoints = re.findall(r'\b(get|post|put|patch|delete|options|head|connect|trace)\s+[/\w-]+',
-                                    feature_description.lower())
+                                  feature_description.lower())
             result["api_endpoints"] = list(set(api_endpoints))
             
             # Extract main concepts (significant nouns and technical terms)
             # Remove stop words and common words
             stopwords = {'a', 'an', 'the', 'and', 'or', 'but', 'if', 'because', 'as', 'what',
-                        'when', 'where', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
-                        'some', 'such', 'no', 'nor', 'too', 'very', 'can', 'will', 'just', 'should',
-                        'now', 'to', 'of', 'for', 'in', 'on', 'by', 'about', 'with', 'feature', 'implement'}
+                      'when', 'where', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
+                      'some', 'such', 'no', 'nor', 'too', 'very', 'can', 'will', 'just', 'should',
+                      'now', 'to', 'of', 'for', 'in', 'on', 'by', 'about', 'with', 'feature', 'implement'}
             
             # Extract nouns and compound terms
             words = re.findall(r'\b[a-zA-Z][a-zA-Z0-9_]*(?:\s+[a-zA-Z][a-zA-Z0-9_]*){0,2}\b', feature_description.lower())
@@ -583,9 +588,10 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
             
             # Detect common implementation patterns - use search instead of hard-coded patterns
             patterns = []
-            try:
-                # Try using the search_implementation_patterns tool if we have grounded search capability
-                if ctx.deps.settings.use_gemini_files:
+            
+            # Try using the search_implementation_patterns tool if we have grounded search capability
+            if ctx.deps.settings.use_gemini_files:
+                try:
                     logger.info("Using grounded search to identify implementation patterns...")
                     # Get the primary language and frameworks from the codebase context
                     languages = []
@@ -631,9 +637,8 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
                         # Clean up and limit patterns
                         patterns = [p[:50] for p in patterns]
                         patterns = patterns[:10]  # Limit to 10 patterns
-                
-            except Exception as e:
-                logger.warning(f"Error using grounded search for patterns: {str(e)}. Falling back to basic analysis.")
+                except Exception as e:
+                    logger.warning(f"Error using grounded search for patterns: {str(e)}. Falling back to basic analysis.")
                 
             # Fall back to basic pattern detection if needed
             if not patterns:
@@ -651,3 +656,10 @@ def register_feature_tools(agent: Agent[CodebaseContext, str], max_retries: int 
                 for pattern_name, keywords in pattern_words.items():
                     if any(kw in feature_description.lower() for kw in keywords):
                         patterns.append(pattern_name)
+            
+            result["implementation_patterns"] = patterns
+            
+        except Exception as e:
+            logger.error(f"Error extracting feature concepts: {str(e)}")
+            
+        return result

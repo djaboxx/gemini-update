@@ -13,6 +13,7 @@ mkdir -p /workspaces/gemini-update/output
 mkdir -p $HOME/.vscode-server/bin
 mkdir -p $HOME/.vscode-server/data
 mkdir -p $HOME/.vscode-server/extensions
+sudo chown -R vscode:vscode $HOME/.vscode-server || true
 
 # Setup pre-commit hooks if .git directory exists and pre-commit is installed
 if [ -d "/workspaces/gemini-update/.git" ] && pip list | grep -q pre-commit; then

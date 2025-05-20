@@ -247,6 +247,19 @@ class GeminiFileManager:
             pass
         
         return None
+        
+    def handle_file_change(self, file_path: Path) -> Optional[str]:
+        """
+        Handle a file creation or modification event by uploading it to Gemini.
+        
+        Args:
+            file_path: Path to the changed file
+            
+        Returns:
+            URI of the uploaded file, or None if the file was not uploaded
+        """
+        # Simply call the upload_file method to handle the file change
+        return self.upload_file(file_path)
     
     def clear_all_files(self) -> int:
         """

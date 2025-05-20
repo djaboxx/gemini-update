@@ -10,7 +10,18 @@ from src.models.analysis import (
     CodeChange, 
     ImplementationPlan,
     CodebaseContext,
-    Settings
+    Settings,
+    AnalysisResult,
+    LanguageStats
+)
+
+from src.models.code_execution import (
+    ExecutionStatus,
+    CodeExecutionError,
+    CodeExecutionResult,
+    CodeExecutionRequest,
+    CodeSuggestion,
+    CodeFixRequest
 )
 
 from src.models.feature import (
@@ -27,6 +38,10 @@ from src.models.gemini import (
     GeminiResponse
 )
 
+from src.models.completion_marker import (
+    AnalysisCompletionMarker
+)
+
 __all__ = [
     # Analysis models
     "CodebaseFile",
@@ -36,7 +51,18 @@ __all__ = [
     "CodeChange",
     "ImplementationPlan",
     "CodebaseContext",
+    "AnalysisResult",
+    "LanguageStats",
+    # Analysis settings
     "Settings",
+    
+    # Code execution models
+    "ExecutionStatus",
+    "CodeExecutionError",
+    "CodeExecutionResult",
+    "CodeExecutionRequest",
+    "CodeSuggestion",
+    "CodeFixRequest",
     
     # Feature models
     "FeatureType",
@@ -48,5 +74,8 @@ __all__ = [
     
     # Gemini models
     "AgentConfig",
-    "GeminiResponse"
+    "GeminiResponse",
+    
+    # Completion markers
+    "AnalysisCompletionMarker"
 ]

@@ -3,8 +3,16 @@ Models for Gemini agent configuration and responses.
 """
 
 from typing import List, Optional, Dict, Any, Literal
-
 from pydantic import BaseModel, Field, ConfigDict
+
+
+class GeminiModelSettings(BaseModel):
+    """Settings for Gemini model configuration."""
+    temperature: float = Field(0.2, description="Temperature for text generation")
+    top_p: float = Field(0.95, description="Top-p for text generation")
+    top_k: int = Field(40, description="Top-k for text generation") 
+    max_output_tokens: int = Field(8192, description="Maximum output tokens")
+    candidate_count: int = Field(1, description="Number of candidate responses")
 
 
 class AgentConfig(BaseModel):

@@ -12,6 +12,9 @@
 		},
 		{
 			"path": "."
+		},
+		{
+			"path": "../ai-library-framework"
 		}
 	],
 	"settings": {}

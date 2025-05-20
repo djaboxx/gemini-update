@@ -13,7 +13,7 @@ from pydantic_ai import RunContext
 from pydantic_ai import ModelRetry
 from pydantic_ai.models.gemini import GeminiModelSettings
 import google.generativeai as genai
-from google.genai.types import GenerationConfig
+from google.generativeai.types import GenerationConfig
 
 from src.models import CodebaseContext
 
