@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  gemini-update:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspaces/gemini-update:cached
+      - gemini-update-extensions:/home/vscode/.vscode-server/extensions
+    env_file:
+      - ../.env
+    command: sleep infinity
+    user: vscode
+    environment:
+      - PYTHONPATH=/workspaces/gemini-update
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  gemini-update-extensions:

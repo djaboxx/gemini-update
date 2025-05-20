@@ -1,0 +1,62 @@
+name: feature-request
+description: Request a new feature
+title: "[Feature Request]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # Feature Request Form
+        Thanks for taking the time to fill out this feature request!
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: A clear and concise description of the feature you'd like to see implemented
+      placeholder: I would like to see...
+    validations:
+      required: true
+  - type: input
+    id: project-context
+    attributes:
+      label: Project Context
+      description: Information about your project where this feature would be useful
+      placeholder: My project is a React web application with...
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe how you would use this feature
+      placeholder: This would help me to...
+    validations:
+      required: true
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Requirements
+      description: List any specific requirements for this feature
+      placeholder: |
+        - The feature should support...
+        - It should integrate with...
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Please indicate any constraints that should be considered
+      options:
+        - label: Must be backward compatible
+        - label: Should perform well on large codebases
+        - label: Should support multiple languages
+        - label: Should work with limited API quota
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: I've tried...
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other information that might be relevant
+      placeholder: More details...

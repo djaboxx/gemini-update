@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  gemini-update:
+    build: .
+    image: gemini-update:latest
+    volumes:
+      - ${PROJECT_DIR:-./}:/workspace:ro
+      - ${OUTPUT_DIR:-./output}:/output
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-pro}
+      - GEMINI_UPDATE_OUTPUT_DIR=/output
+      - GEMINI_UPDATE_USE_FILES=${USE_GEMINI_FILES:-false}
+      - GEMINI_UPDATE_MAX_FILE_SIZE=${MAX_FILE_SIZE:-4.0}
+    command: ["analyze", "--project-dir", "/workspace"]

@@ -1,0 +1,8 @@
+ImportError: Failed to import test module: test_feature_tools_gemini
+Traceback (most recent call last):
+  File "/usr/local/Cellar/python@3.12/3.12.10/Frameworks/Python.framework/Versions/3.12/lib/python3.12/unittest/loader.py", line 137, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/darnold/git/gemini-update/tests/test_feature_tools_gemini.py", line 10, in <module>
+    from pydantic_ai import RunContext
+ModuleNotFoundError: No module named 'pydantic_ai'

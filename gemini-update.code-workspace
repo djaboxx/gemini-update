@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"name": "gemini-prompt",
+			"path": "../terraform-prompt-template"
+		},
+		{
+			"path": "../gemini-stacktrace"
+		},
+		{
+			"path": "../GeminiWorkspace"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}

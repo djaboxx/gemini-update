@@ -1,0 +1,86 @@
+{
+  "name": "Gemini Update",
+  // Use Docker Compose for more advanced setups
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "gemini-update",
+  "workspaceFolder": "/workspaces/gemini-update",
+  "runArgs": [
+    "--env-file", "${localWorkspaceFolder}/.env"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "github.copilot",
+        "github.copilot-chat",
+        "ms-azuretools.vscode-docker",
+        "ryanluker.vscode-coverage-gutters",
+        "ms-python.flake8",
+        "tamasfe.even-better-toml",
+        "yzhang.markdown-all-in-one",
+        "mechatroner.rainbow-csv",
+        "bierner.markdown-preview-github-styles"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.formatting.provider": "black",
+        "python.formatting.blackPath": "/usr/local/bin/black",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.linting.pylintPath": "/usr/local/bin/pylint",
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+        "python.testing.nosetestsEnabled": false,
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/.pytest_cache": true,
+          "**/*.egg-info": true
+        },
+        "terminal.integrated.env.linux": {
+          "PYTHONPATH": "${workspaceFolder}"
+        }
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "updateRemoteUserUID": true,
+  "postCreateCommand": "pip install --user -e . && bash ./.devcontainer/setup.sh",
+  "remoteUser": "vscode",
+  // Configure tool-specific development environment settings
+  "forwardPorts": [],
+  "mounts": [
+    "source=${localWorkspaceFolder}/output,target=/workspaces/gemini-update/output,type=bind,consistency=cached",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,readonly",
+    "source=${localEnv:HOME}/git/terraform-prompt-template,target=/workspaces/terraform-prompt-template,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/git/gemini-stacktrace,target=/workspaces/gemini-stacktrace,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/git/GeminiWorkspace,target=/workspaces/GeminiWorkspace,type=bind,consistency=cached"
+  ],
+  "containerUser": "vscode",
+  "updateRemoteUserUID": true,
+  // Add default VS Code tasks
+  "portsAttributes": {
+    "9000": {
+      "label": "Documentation Server",
+      "onAutoForward": "notify"
+    }
+  },
+  "postStartCommand": "echo 'Run: cp .devcontainer/.env.example .env && edit .env to set your API key'"
+}
