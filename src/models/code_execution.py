@@ -86,6 +86,8 @@ class CodeExecutionResult(BaseModel):
 
 class EnvVar(BaseModel):
     """Represents a single environment variable with a name and value."""
+    model_config = {"extra": "forbid"}
+
     name: str = Field(..., description="The name of the environment variable.")
     value: str = Field(..., description="The value of the environment variable.")
 
