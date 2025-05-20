@@ -61,9 +61,10 @@
     },
     "ghcr.io/devcontainers/features/git:1": {}
   },
-  "updateRemoteUserUID": true,
   "postCreateCommand": "pip install --user -e . && bash ./.devcontainer/setup.sh",
   "remoteUser": "vscode",
+  "containerUser": "vscode",
+  "updateRemoteUserUID": true,
   // Configure tool-specific development environment settings
   "forwardPorts": [],
   "mounts": [
@@ -73,8 +74,6 @@
     "source=${localEnv:HOME}/git/gemini-stacktrace,target=/workspaces/gemini-stacktrace,type=bind,consistency=cached",
     "source=${localEnv:HOME}/git/GeminiWorkspace,target=/workspaces/GeminiWorkspace,type=bind,consistency=cached"
   ],
-  "containerUser": "vscode",
-  "updateRemoteUserUID": true,
   // Add default VS Code tasks
   "portsAttributes": {
     "9000": {
