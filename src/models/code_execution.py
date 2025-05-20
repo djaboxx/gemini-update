@@ -84,6 +84,12 @@ class CodeExecutionResult(BaseModel):
         return md
 
 
+class EnvVar(BaseModel):
+    """Represents a single environment variable with a name and value."""
+    name: str = Field(..., description="The name of the environment variable.")
+    value: str = Field(..., description="The value of the environment variable.")
+
+
 class CodeExecutionRequest(BaseModel):
     """Request for code execution."""
     
@@ -91,7 +97,7 @@ class CodeExecutionRequest(BaseModel):
     timeout_seconds: int = Field(default=10, description="Maximum execution time in seconds")
     description: str = Field(default="Code analysis", description="Description of what the code is doing")
     max_output_size: int = Field(default=100000, description="Maximum size of output to capture")
-    environment_variables: Optional[Dict[str, str]] = Field(default=None, description="Environment variables to set")
+    environment_variables: Optional[List[EnvVar]] = Field(default=None, description="Environment variables to set")
     
     @validator('code')
     def code_must_not_be_empty(cls, v):
