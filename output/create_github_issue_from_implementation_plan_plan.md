@@ -1,10 +1,10 @@
 # Implementation Plan for Create GitHub Issue from Implementation Plan
 
-*Generated at: 2025-05-20 00:38:47*
+*Generated at: 2025-05-20 10:59:14*
 
 ## Description
 
-Allows users to generate a GitHub issue directly from a generated implementation plan, populating the issue with details from the plan.
+Add functionality to generate and create a GitHub issue directly from a generated implementation plan, pre-populating the issue with details from the plan.
 
 **Estimated Complexity**: Medium
 
@@ -12,354 +12,253 @@ Allows users to generate a GitHub issue directly from a generated implementation
 
 ### Files to Modify
 
-- `frontend/src/components/ImplementationPlanView.js`
-- `backend/src/config.py`
-- `backend/src/main.py`
+- `backend/api_routes.py`
+- `frontend/plan_viewer.html`
 
 ### New Files to Create
 
-- `frontend/src/components/GitHubIssueModal.js`
-- `frontend/src/services/githubService.js`
-- `backend/src/routes/github.py`
-- `backend/src/services/github_service.py`
+- `backend/github_service.py`
 
 ### Dependencies to Add
 
-- `requests (backend)`
-- `FastAPI (backend, if not already used)`
-- `Pydantic (backend, if not already used)`
-
-### Configuration Changes
-
-- Add GITHUB_TOKEN to backend configuration/environment variables.
+- `requests`
 
 ## Implementation Steps
 
-### Step 1: Modify frontend/src/components/ImplementationPlanView.js
+### Step 1: Add backend/github_service.py
 
-**Description:** Add 'Create GitHub Issue' button to the implementation plan view.
-
-**Code:**
-
-```
-// Assuming a React-like structure
-<div className="implementation-plan-view">
-  {/* ... existing plan details ... */}
-  <button onClick={handleCreateGitHubIssue}>Create GitHub Issue</button>
-  {/* ... rest of the component ... */}
-</div>
-```
-
-### Step 2: Add frontend/src/components/GitHubIssueModal.js
-
-**Description:** Create a new modal component for collecting GitHub issue details.
+**Description:** Create a new Python module for GitHub API interactions.
 
 **Code:**
 
 ```
-// Basic structure for a modal form
-import React, { useState } from 'react';
+# backend/github_service.py
 
-function GitHubIssueModal({ isOpen, onClose, onSubmit, planDetails }) {
-  const [repository, setRepository] = useState('');
-  const [titlePrefix, setTitlePrefix] = useState('');
-  const [assignees, setAssignees] = useState(''); // Comma-separated usernames
-  const [labels, setLabels] = useState(''); // Comma-separated labels
+import requests
+import os # Example for token retrieval
 
-  const handleSubmit = () => {
-    onSubmit({
-      repository,
-      titlePrefix,
-      assignees: assignees.split(',').map(s => s.trim()).filter(s => s),
-      labels: labels.split(',').map(s => s.trim()).filter(s => s),
-      planDetails,
-    });
-  };
+class GitHubService:
+    def __init__(self, auth_token=None):
+        # In a real app, handle token securely (e.g., OAuth flow, config management)
+        self.auth_token = auth_token or os.environ.get("GITHUB_TOKEN")
+        if not self.auth_token:
+            # Handle authentication failure appropriately
+            raise ValueError("GitHub authentication token not provided.")
+        self.base_url = "https://api.github.com"
+        self.headers = {
+            "Authorization": f"token {self.auth_token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
 
-  if (!isOpen) return null;
+    def create_issue(self, owner: str, repo: str, title: str, body: str):
+        url = f"{self.base_url}/repos/{owner}/{repo}/issues"
+        data = {
+            "title": title,
+            "body": body
+        }
+        try:
+            response = requests.post(url, json=data, headers=self.headers)
+            response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+            return response.json() # Returns the created issue object
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP error creating GitHub issue: {e.response.status_code} - {e.response.text}")
+            # Implement specific error handling (e.g., 401, 404, 403 rate limit)
+            if e.response.status_code == 403 and 'rate limit exceeded' in e.response.text.lower():
+                 # Handle rate limit - potentially raise a specific exception or wait/retry
+                 pass # Placeholder
+            raise # Re-raise the exception after logging/handling
+        except requests.exceptions.RequestException as e:
+            print(f"Error creating GitHub issue: {e}")
+            raise # Re-raise other request exceptions
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <h2>Create GitHub Issue</h2>
-        <label>Repository (e.g., owner/repo):</label>
-        <input type="text" value={repository} onChange={e => setRepository(e.target.value)} />
+# Helper function to format plan into markdown
+def format_plan_for_github_issue(plan_data: dict) -> str:
+    # Assuming plan_data is the dictionary representation of the ImplementationPlan
+    body = f"# Feature: {plan_data.get('feature_name', 'N/A')}\n\n"
+    body += f"**Description:**\n{plan_data.get('description', 'N/A')}\n\n"
+    body += f"**Estimated Complexity:** {plan_data.get('estimated_complexity', 'N/A')}\n\n"
 
-        <label>Title Prefix (Optional):</label>
-        <input type="text" value={titlePrefix} onChange={e => setTitlePrefix(e.target.value)} />
+    scope = plan_data.get('scope', {})
+    if scope:
+        body += "**Scope:**\n"
+        if scope.get('affected_files'):
+            body += "- **Affected Files:**\n"
+            for f in scope['affected_files']:
+                body += f"  - `{f}`\n"
+        if scope.get('new_files'):
+            body += "- **New Files:**\n"
+            for f in scope['new_files']:
+                body += f"  - `{f}`\n"
+        if scope.get('dependencies_needed'):
+             body += "- **Dependencies Needed:**\n"
+             for d in scope['dependencies_needed']:
+                 body += f"  - `{d}`\n"
+        if scope.get('config_changes'):
+             body += "- **Configuration Changes:**\n"
+             for c in scope['config_changes']:
+                 body += f"  - {c}\n"
+        body += "\n"
 
-        <label>Assignees (comma-separated usernames, Optional):</label>
-        <input type="text" value={assignees} onChange={e => setAssignees(e.target.value)} />
+    changes = plan_data.get('changes', [])
+    if changes:
+        body += "**Implementation Changes:**\n\n"
+        for i, change in enumerate(changes):
+            body += f"### Change {i+1}: {change.get('description', 'No description')}\n"
+            body += f"- **File:** `{change.get('file_path', 'N/A')}`\n"
+            body += f"- **Type:** `{change.get('change_type', 'N/A')}`\n"
+            if change.get('line_range'):
+                 body += f"- **Lines:** `{change.get('line_range', 'N/A')}`\n"
+            if change.get('code_snippet'):
+                body += "\n```\n"
+                body += change['code_snippet']
+                body += "\n```\n"
+            body += "\n"
 
-        <label>Labels (comma-separated, Optional):</label>
-        <input type="text" value={labels} onChange={e => setLabels(e.target.value)} />
+    dependencies = plan_data.get('dependencies', [])
+    if dependencies:
+        body += "**Dependencies between Changes:**\n"
+        for dep in dependencies:
+            body += f"- {dep}\n"
+        body += "\n"
 
-        <button onClick={handleSubmit}>Create Issue</button>
-        <button onClick={onClose}>Cancel</button>
-      </div>
-    </div>
-  );
-}
+    # Add a note about the source
+    body += "---\n*Generated from an implementation plan.*\n"
 
-export default GitHubIssueModal;
+    return body
+
+def generate_issue_title(feature_name: str) -> str:
+    return f"Implement Feature: {feature_name}"
+
 ```
 
-### Step 3: Modify frontend/src/components/ImplementationPlanView.js
+### Step 2: Modify backend/api_routes.py
 
-**Description:** Integrate the GitHub issue modal into the implementation plan view component and handle button click.
+**Description:** Add a new API endpoint to receive the implementation plan and repository details, then call the GitHub service.
 
 **Code:**
 
 ```
-// Assuming a React-like structure
-import React, { useState } from 'react';
-import GitHubIssueModal from './GitHubIssueModal';
-import { createGitHubIssue } from '../services/githubService'; // Assuming a service file
+# backend/api_routes.py
 
-function ImplementationPlanView({ plan }) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleCreateGitHubIssue = () => {
-    setIsModalOpen(true);
-  };
-
-  const handleModalClose = () => {
-    setIsModalOpen(false);
-  };
-
-  const handleModalSubmit = async (issueDetails) => {
-    try {
-      // Call backend service to create issue
-      const result = await createGitHubIssue(issueDetails);
-      console.log('Issue created:', result);
-      // Display success message (req-8)
-      alert(`Issue created successfully: ${result.html_url}`);
-    } catch (error) {
-      console.error('Error creating issue:', error);
-      // Display error message (req-9)
-      alert(`Failed to create issue: ${error.message}`);
-    } finally {
-      setIsModalOpen(false);
-    }
-  };
-
-  return (
-    <div className="implementation-plan-view">
-      {/* ... existing plan details ... */}
-      <button onClick={handleCreateGitHubIssue}>Create GitHub Issue</button>
-      {/* ... rest of the component ... */}
-
-      <GitHubIssueModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        onSubmit={handleModalSubmit}
-        planDetails={plan} // Pass the current plan details
-      />
-    </div>
-  );
-}
-
-export default ImplementationPlanView;
-```
-
-### Step 4: Add frontend/src/services/githubService.js
-
-**Description:** Create a frontend service to call the backend API for GitHub issue creation.
-
-**Code:**
-
-```
-// Basic service file
-import api from './api'; // Assuming an existing API client setup
-
-export const createGitHubIssue = async (issueDetails) => {
-  try {
-    const response = await api.post('/api/github/create-issue', issueDetails);
-    return response.data;
-  } catch (error) {
-    console.error('API call error:', error);
-    throw error; // Re-throw to be caught by the component
-  }
-};
-```
-
-### Step 5: Add backend/src/routes/github.py
-
-**Description:** Create a new backend endpoint to handle GitHub issue creation requests.
-
-**Code:**
-
-```
-# Example using FastAPI
-from fastapi import APIRouter, Depends, HTTPException
+# Assuming a framework like FastAPI
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
-
-from ..services.github_service import GitHubService # Assuming a service file
-from ..dependencies import get_github_service # Assuming dependency injection
+from .github_service import GitHubService, format_plan_for_github_issue, generate_issue_title
 
 router = APIRouter()
 
-class CreateIssueRequest(BaseModel):
-    repository: str
-    titlePrefix: Optional[str] = None
-    assignees: Optional[List[str]] = None
-    labels: Optional[List[str]] = None
-    planDetails: dict # Structure matches the ImplementationPlan object
+class CreateGitHubIssueRequest(BaseModel):
+    owner: str
+    repo: str
+    plan_data: dict # Assuming the plan data is sent as a dictionary
 
-@router.post('/create-issue')
-async def create_github_issue(request: CreateIssueRequest, github_service: GitHubService = Depends(get_github_service)):
+@router.post("/create_github_issue")
+async def create_github_issue(request: CreateGitHubIssueRequest):
     try:
-        issue_url = await github_service.create_issue(
-            repository=request.repository,
-            title_prefix=request.titlePrefix,
-            assignees=request.assignees,
-            labels=request.labels,
-            plan_details=request.planDetails
-        )
-        return {'html_url': issue_url}
+        # Initialize GitHubService (handle auth_token securely in a real app)
+        github_service = GitHubService() # Token should be managed securely
+
+        title = generate_issue_title(request.plan_data.get('feature_name', 'New Feature'))
+        body = format_plan_for_github_issue(request.plan_data)
+
+        issue = github_service.create_issue(request.owner, request.repo, title, body)
+
+        return {
+            "message": "GitHub issue created successfully!",
+            "issue_url": issue.get("html_url")
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Authentication Error: {e}")
     except Exception as e:
-        # Basic error handling, needs refinement based on specific API errors (req-15)
-        raise HTTPException(status_code=500, detail=str(e))
-```
-
-### Step 6: Add backend/src/services/github_service.py
-
-**Description:** Create a backend service class for interacting with the GitHub API.
-
-**Code:**
-
-```
-# Basic structure for a GitHub service
-import os # Example for getting token from env var
-import requests # Using requests library
-
-class GitHubService:
-    def __init__(self, github_token: str):
-        self.base_url = 'https://api.github.com'
-        self.headers = {
-            'Authorization': f'token {github_token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
-
-    def format_issue_body(self, plan_details: dict) -> str:
-        # Implement mapping from plan_details to Markdown body (req-6, req-14)
-        body = f"""# Implementation Plan: {plan_details.get('feature_name', 'N/A')}\n\n"
-        body += f"## Description\n{plan_details.get('description', 'N/A')}\n\n"
-        body += f"## Scope\n"
-        scope = plan_details.get('scope', {})
-        if scope.get('affected_files'):
-            body += f"- **Affected Files:** {', '.join(scope['affected_files'])}\n"
-        if scope.get('new_files'):
-            body += f"- **New Files:** {', '.join(scope['new_files'])}\n"
-        if scope.get('dependencies_needed'):
-             body += f"- **Dependencies Needed:** {', '.join(scope['dependencies_needed'])}\n"
-        if scope.get('config_changes'):
-             body += f"- **Config Changes:** {', '.join(scope['config_changes'])}\n"
-        body += f"\n"
-
-        body += f"## Changes\n"
-        changes = plan_details.get('changes', [])
-        if changes:
-            for change in changes:
-                body += f"- **{change.get('change_type', 'Change')}** {change.get('file_path', 'N/A')}: {change.get('description', 'N/A')}\n"
-                # Optionally include code snippet, handle large snippets (req-6)
-                # if change.get('code_snippet'):
-                #     body += f"\n```\n{change['code_snippet'][:500]}...\n```\n"
-        else:
-            body += "No specific code changes detailed.\n"
-        body += f"\n"
-
-        body += f"## Estimated Complexity\n{plan_details.get('estimated_complexity', 'N/A')}\n\n"
-
-        # Add dependencies if available
-        dependencies = plan_details.get('dependencies')
-        if dependencies:
-             body += f"## Dependencies\n"
-             for dep in dependencies:
-                 body += f"- {dep}\n"
-             body += f"\n"
-
-        return body
-
-    async def create_issue(
-        self, repository: str, title_prefix: Optional[str], assignees: Optional[List[str]], labels: Optional[List[str]], plan_details: dict
-    ) -> str:
-        # Implement GitHub API call to create issue (req-7, req-12)
-        url = f'{self.base_url}/repos/{repository}/issues'
-
-        title = plan_details.get('feature_name', 'New Issue from Plan')
-        if title_prefix:
-            title = f'{title_prefix} {title}'
-
-        body = self.format_issue_body(plan_details)
-
-        payload = {
-            'title': title,
-            'body': body,
-            'assignees': assignees or [],
-            'labels': labels or []
-        }
-
-        response = requests.post(url, headers=self.headers, json=payload)
-
-        # Handle API response and errors (req-9, req-10, req-15)
-        if response.status_code == 201:
-            return response.json()['html_url']
-        elif response.status_code == 401:
-             raise Exception('GitHub Authentication failed. Check your token.')
-        elif response.status_code == 404:
-             raise Exception(f'Repository not found: {repository}')
-        elif response.status_code == 403 and 'rate limit exceeded' in response.text:
-             raise Exception('GitHub API rate limit exceeded. Please wait before trying again.') # req-10
-        else:
-            raise Exception(f'Failed to create GitHub issue: {response.status_code} - {response.text}')
-
-# Example dependency provider (needs actual implementation)
-def get_github_service():
-    # Securely retrieve GitHub token (req-11)
-    github_token = os.environ.get('GITHUB_TOKEN') # Example: get from environment variable
-    if not github_token:
-        raise Exception('GitHub token not configured.')
-    return GitHubService(github_token=github_token)
-```
-
-### Step 7: Modify backend/src/config.py
-
-**Description:** Add configuration for GitHub token (e.g., environment variable, config file).
-
-**Code:**
-
-```
-# Example config file
-import os
-
-GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN') # Securely retrieve token
-```
-
-### Step 8: Modify backend/src/main.py
-
-**Description:** Update main backend app to include the new GitHub router.
-
-**Code:**
-
-```
-# Example FastAPI app
-from fastapi import FastAPI
-from .routes import github # Import the new router
-
-app = FastAPI()
-
-# Include the new router
-app.include_router(github.router, prefix='/api/github', tags=['github'])
+        # Catch other potential errors from the service (API errors, etc.)
+        print(f"Error in /create_github_issue endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create GitHub issue: {e}")
 
 # ... other routes ...
+
+```
+
+### Step 3: Modify frontend/plan_viewer.html
+
+**Description:** Add UI elements (button, repo input) and JavaScript logic to trigger the GitHub issue creation endpoint.
+
+**Code:**
+
+```
+<!-- frontend/plan_viewer.html -->
+
+<!-- ... existing plan display ... -->
+
+<div id="github-issue-section">
+    <h3>Create GitHub Issue</h3>
+    <label for="github-repo">Repository (owner/repo):</label>
+    <input type="text" id="github-repo" placeholder="e.g., google/gemini-api-cookbook">
+    <button id="create-github-issue-btn">Create GitHub Issue</button>
+    <div id="github-issue-status"></div>
+</div>
+
+<script>
+    // Assuming planData is available globally or passed to this script
+    // let planData = { ... }; // The generated implementation plan object
+
+    document.getElementById('create-github-issue-btn').addEventListener('click', async () => {
+        const repoInput = document.getElementById('github-repo');
+        const statusDiv = document.getElementById('github-issue-status');
+        const repo = repoInput.value.trim();
+
+        if (!repo) {
+            statusDiv.innerText = 'Please enter a repository (owner/repo).';
+            statusDiv.style.color = 'red';
+            return;
+        }
+
+        const repoParts = repo.split('/');
+        if (repoParts.length !== 2 || !repoParts[0] || !repoParts[1]) {
+             statusDiv.innerText = 'Invalid repository format. Use owner/repo.';
+             statusDiv.style.color = 'red';
+             return;
+        }
+
+        statusDiv.innerText = 'Creating GitHub issue...';
+        statusDiv.style.color = 'black';
+
+        try {
+            // Assuming planData is the variable holding the current plan
+            const response = await fetch('/api/create_github_issue', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    owner: repoParts[0],
+                    repo: repoParts[1],
+                    plan_data: planData // Send the plan data
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                statusDiv.innerHTML = `Success! Issue created: <a href="${result.issue_url}" target="_blank">${result.issue_url}</a>`;
+                statusDiv.style.color = 'green';
+            } else {
+                statusDiv.innerText = `Error: ${result.detail || 'Unknown error'}`;
+                statusDiv.style.color = 'red';
+            }
+        } catch (error) {
+            statusDiv.innerText = `Request failed: ${error}`;
+            statusDiv.style.color = 'red';
+            console.error('Error creating GitHub issue:', error);
+        }
+    });
+</script>
+
+<!-- ... rest of the HTML ... -->
+
 ```
 
 ## Dependencies Between Changes
 
-- Implement backend GitHubService (backend/src/services/github_service.py) before creating the backend endpoint (backend/src/routes/github.py).
-- Implement the backend endpoint (backend/src/routes/github.py) before implementing the frontend service (frontend/src/services/githubService.js).
-- Implement the frontend modal component (frontend/src/components/GitHubIssueModal.js) before integrating it into the ImplementationPlanView (frontend/src/components/ImplementationPlanView.js).
-- Securely configure the GITHUB_TOKEN before running the backend service.
+- backend/github_service.py must be created before backend/api_routes.py is modified.
+- backend/api_routes.py must be modified before frontend/plan_viewer.html is modified.
 
