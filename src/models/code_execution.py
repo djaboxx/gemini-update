@@ -156,4 +156,3 @@ class CodeFixRequest(BaseModel):
             
         prompt += "\nPlease provide a corrected version of the code that addresses these errors."
         return prompt
-"""
